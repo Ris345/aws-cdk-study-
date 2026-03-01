@@ -2,6 +2,12 @@
 .cdk.staging
 cdk.out
 
+# Environment / secrets — never commit these
+.env
+.env.*
+.env.local
+.env.*.local
+
 # Created by https://www.gitignore.io/api/csharp
 
 ### Csharp ###

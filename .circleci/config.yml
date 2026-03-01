@@ -1,0 +1,116 @@
+version: 2.1
+
+# ── Reusable executor ──────────────────────────────────────────────────────────
+executors:
+  dotnet-node:
+    docker:
+      - image: mcr.microsoft.com/dotnet/sdk:8.0
+    environment:
+      AWS_DEFAULT_REGION: us-east-1
+
+# ── Reusable commands ──────────────────────────────────────────────────────────
+commands:
+  install-cdk:
+    steps:
+      - run:
+          name: Install Node.js 22 and AWS CDK CLI
+          command: |
+            curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+            apt-get install -y nodejs
+            npm install -g aws-cdk
+
+  restore-nuget-cache:
+    steps:
+      - restore_cache:
+          keys:
+            - nuget-v1-{{ checksum "src/AwsCdkCSharpStudy/AwsCdkCSharpStudy.csproj" }}
+            - nuget-v1-
+
+  save-nuget-cache:
+    steps:
+      - save_cache:
+          key: nuget-v1-{{ checksum "src/AwsCdkCSharpStudy/AwsCdkCSharpStudy.csproj" }}
+          paths:
+            - ~/.nuget/packages
+
+# ── Jobs ───────────────────────────────────────────────────────────────────────
+jobs:
+  # Runs on every branch/PR — no AWS credentials required
+  build-and-synth:
+    executor: dotnet-node
+    steps:
+      - checkout
+      - restore-nuget-cache
+      - run:
+          name: Restore dependencies
+          command: dotnet restore src
+      - save-nuget-cache
+      - run:
+          name: Build
+          command: dotnet build src --no-restore
+      - install-cdk
+      - run:
+          name: CDK Synth (validate CloudFormation template)
+          command: cdk synth
+
+  # Shows exactly what will change in AWS — runs on every branch/PR
+  diff:
+    executor: dotnet-node
+    steps:
+      - checkout
+      - restore-nuget-cache
+      - run:
+          name: Restore and Build
+          command: dotnet restore src && dotnet build src --no-restore
+      - install-cdk
+      - run:
+          name: CDK Diff (compare against live stack)
+          command: cdk diff
+
+  # Deploys to AWS — only on main, only after manual approval
+  deploy:
+    executor: dotnet-node
+    steps:
+      - checkout
+      - restore-nuget-cache
+      - run:
+          name: Restore and Build
+          command: dotnet restore src && dotnet build src --no-restore
+      - install-cdk
+      - run:
+          name: CDK Bootstrap (idempotent — safe to run every time)
+          command: cdk bootstrap
+      - run:
+          name: CDK Deploy
+          command: cdk deploy --require-approval never
+
+# ── Workflow ───────────────────────────────────────────────────────────────────
+workflows:
+  ci-cd:
+    jobs:
+      # 1. Build + validate template on every push (no AWS creds)
+      - build-and-synth
+
+      # 2. Show drift against live AWS stack (needs AWS creds)
+      - diff:
+          requires:
+            - build-and-synth
+          context: aws-cdk-deploy
+
+      # 3. Manual approval gate — only blocks deploy on main
+      - hold-for-approval:
+          type: approval
+          requires:
+            - diff
+          filters:
+            branches:
+              only: main
+
+      # 4. Deploy to AWS after approval
+      - deploy:
+          requires:
+            - hold-for-approval
+          context: aws-cdk-deploy
+          filters:
+            branches:
+              only: main

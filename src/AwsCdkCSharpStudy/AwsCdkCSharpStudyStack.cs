@@ -1,4 +1,5 @@
 using Amazon.CDK;
+using Amazon.CDK.AWS.S3;
 using Constructs;
 
 namespace AwsCdkCSharpStudy
@@ -7,7 +8,16 @@ namespace AwsCdkCSharpStudy
     {
         internal AwsCdkCSharpStudyStack(Construct scope, string id, IStackProps props = null) : base(scope, id, props)
         {
-            // The code that defines your stack goes here
+            new Bucket(this, "StudyBucket", new BucketProps
+            {
+                Versioned = true,
+                RemovalPolicy = RemovalPolicy.RETAIN,
+                Encryption = BucketEncryption.S3_MANAGED,
+                BlockPublicAccess = BlockPublicAccess.BLOCK_ALL,
+                EnforceSSL = true,
+            });
         }
     }
 }
+
+

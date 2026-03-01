@@ -1,14 +1,25 @@
-# Welcome to your CDK C# project!
+# AWS CDK C# Study Project
 
-This is a blank project for CDK development with C#.
+A hands-on project for learning AWS infrastructure provisioning using AWS CDK with C#. The stack currently provisions a secure S3 bucket and will grow to cover more AWS services over time.
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+## Stack
 
-It uses the [.NET CLI](https://docs.microsoft.com/dotnet/articles/core/) to compile and execute your project.
+- **S3 Bucket** — versioned, encrypted at rest (SSE-S3), all public access blocked, SSL enforced
 
-## Useful commands
+## CI/CD
 
-* `dotnet build src` compile this app
-* `cdk deploy`       deploy this stack to your default AWS account/region
-* `cdk diff`         compare deployed stack with current state
-* `cdk synth`        emits the synthesized CloudFormation template
+CircleCI pipeline with four stages:
+1. **build-and-synth** — compiles the project and validates the CloudFormation template (runs on every push, no AWS credentials required)
+2. **diff** — compares the local stack against what is live in AWS (runs on every push)
+3. **hold-for-approval** — manual gate before any deployment (main branch only)
+4. **deploy** — bootstraps and deploys the stack to AWS (main branch only, after approval)
+
+AWS credentials are stored in a CircleCI context and never committed to the repo.
+
+## Commands
+
+- `dotnet build src` — compile the project
+- `cdk synth` — emit the CloudFormation template
+- `cdk diff` — compare local stack with deployed stack
+- `cdk deploy` — deploy to AWS
+- `cdk destroy` — tear down the stack (bucket is retained by default)
